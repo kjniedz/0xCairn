@@ -29,7 +29,7 @@ Free generator (`/`)
 - Split-key mode (generate, mine for someone, combine).
 - Lost-run banner from a key-free checkpoint after a refresh.
 
-Cairn Pro (`/pro/`): quote from difficulty, local keypair generation, USDC (Base) or ETH (mainnet) payment to a per-order address derived from an xpub, order page with queued / mining / found status, optional email, refund policy (full refund on request past 5× the estimate), client-side combine step.
+Cairn Pro (`/pro/`): quote from difficulty, local keypair generation, payment in USDC (Base) or ETH (mainnet) to a per-order address derived from an xpub, or in BTC to a single address with a per-order unique satoshi amount (matched via mempool.space after one confirmation), order page with queued / mining / found status, optional email, refund policy (full refund on request past 5× the estimate), client-side combine step.
 
 Cairn for Teams (`/teams/`): CREATE2 jobs over a REST API (`/api/v1/jobs`, `/api/v1/quote`) with API keys, prepaid or postpaid, bit-mask targets, and a CLI (`cli/cairn.mjs`).
 
@@ -85,7 +85,9 @@ One-time setup already done: D1 database `0xcairn` (schema in `worker/schema.sql
 XDG_CONFIG_HOME=~/.config/wrangler-personal npx wrangler secret put PAYMENT_XPUB
 ```
 
-Until `PAYMENT_XPUB` is set, `/api/health` reports `payments: false`, the Pro page says so, and orders cannot be created. Postpaid Teams keys work without it.
+Bitcoin checkout works today (`BTC_ADDRESS` var in `wrangler.jsonc`, tips and payments both go to `bc1quspfcg3k95lde05tfh0n798nz3k09v75j0zmvp`). Until `PAYMENT_XPUB` is set, `/api/health` reports `evm: false`, the USDC and ETH buttons are disabled and the Pro page defaults to BTC. Postpaid Teams keys work without any payment config.
+
+Schema changes after the initial deploy live in `web/worker/migrations/` and are applied with `wrangler d1 execute 0xcairn --remote --file=worker/migrations/NNN.sql`.
 
 ### Running a GPU worker
 

@@ -22,7 +22,9 @@
     "SITE_URL": "https://0xcairn.kyleniedz99.workers.dev",
     "RPC_ETH": "https://cloudflare-eth.com",
     "RPC_BASE": "https://mainnet.base.org",
-    "USDC_BASE": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+    "USDC_BASE": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "BTC_ADDRESS": "bc1quspfcg3k95lde05tfh0n798nz3k09v75j0zmvp",
+    "BTC_API": "https://mempool.space/api"
   },
   // Secrets (set with `wrangler secret put NAME` under the personal profile):
   //   PAYMENT_XPUB   BIP32 xpub whose child i receives payment for order i. Keep the xpriv offline.

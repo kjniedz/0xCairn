@@ -3,7 +3,7 @@
  * cairn: tiny CLI for the Cairn Teams API.
  *
  *   CAIRN_API_KEY=... node cli/cairn.mjs quote --prefix 0000
- *   CAIRN_API_KEY=... node cli/cairn.mjs create2 --deployer 0x… --init-code-hash 0x… --prefix 0000 [--suffix …] [--mask … --value …] [--wait]
+ *   CAIRN_API_KEY=... node cli/cairn.mjs create2 --deployer 0x… --init-code-hash 0x… --prefix 0000 [--suffix …] [--mask … --value …] [--pay-asset USDC|ETH|BTC] [--wait]
  *   CAIRN_API_KEY=... node cli/cairn.mjs status <token> [--wait]
  *
  * Prints JSON so it can be piped into a deploy script. Exit code 0 when a salt

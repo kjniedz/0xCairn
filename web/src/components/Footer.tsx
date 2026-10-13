@@ -4,18 +4,26 @@ import { CopyButton } from './Copy';
 import { qrMatrix } from '../lib/qr';
 import { toChecksum } from '../lib/eth';
 
-function TipAddress() {
-  if (!SITE.tipAddress) return null;
-  const addr = '0x' + toChecksum(SITE.tipAddress);
-  const m = useMemo(() => qrMatrix(addr), [addr]);
+function Tip({ label, addr, uri }: { label: string; addr: string; uri: string }) {
+  const m = useMemo(() => qrMatrix(uri, 'L'), [uri]);
   return (
     <span class="tip" tabIndex={0}>
-      <span style={{ fontFamily: 'var(--sans)' }}>Tips, mined with 0xCairn:</span>
+      <span style={{ fontFamily: 'var(--sans)' }}>{label}</span>
       <span class="addr">{addr}</span>
       <CopyButton text={addr} label="Copy" />
       <svg class="qr-pop" viewBox={`0 0 ${m.size} ${m.size}`} shape-rendering="crispEdges" aria-hidden="true">
         <path d={m.path} fill="#000" />
       </svg>
+    </span>
+  );
+}
+
+function TipAddress() {
+  const evm = SITE.tipAddress ? '0x' + toChecksum(SITE.tipAddress) : null;
+  return (
+    <span style={{ display: 'grid', gap: '6px' }}>
+      {evm && <Tip label="Tips, mined with 0xCairn (any EVM chain):" addr={evm} uri={`ethereum:${evm}`} />}
+      {SITE.tipBtc && <Tip label="Bitcoin:" addr={SITE.tipBtc} uri={`bitcoin:${SITE.tipBtc}`} />}
     </span>
   );
 }

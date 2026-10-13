@@ -26,7 +26,7 @@
         <h2>Teams jobs</h2>
         <p>API jobs store the deployer address, init code hash, target, the salt we find, and the API key that submitted them. Contact form messages store the email, company and message you type. API keys are stored hashed.</p>
         <h2>Payments</h2>
-        <p>Payments are on-chain transfers to addresses we derive per order. We read public chain data to detect them through third-party RPC endpoints (Cloudflare Ethereum gateway, Base public RPC); those providers see the queries we make but receive nothing about you. We fetch the ETH/USD spot price from Coinbase's public API server-side at quote time.</p>
+        <p>Payments are on-chain transfers: to addresses we derive per order for USDC and ETH, or to our Bitcoin address with an amount unique to your order. We read public chain data to detect them through third-party endpoints (Cloudflare Ethereum gateway, Base public RPC, mempool.space for Bitcoin); those providers see the queries we make but receive nothing about you. We fetch the ETH/USD spot price from Coinbase's public API server-side at quote time.</p>
         <h2>Email</h2>
         <p>If you give an email for a "found" notification we send exactly one message when the job completes and nothing else. We never share or sell it.</p>
         <h2>Your rights</h2>

@@ -5,6 +5,7 @@ import { difficulty, probability, matchesPattern, packForGpu, validatePattern, f
 import { privateKeyToAddress, toChecksum, create2Address, addScalars, splitKeyAddress, privateKeyToPublicKey, hexToBytes, bytesToHex, keccak256Hex, randomScalar, CURVE_N, bytesToBigInt } from './eth.ts';
 import { encryptKeystoreV3, decryptKeystoreV3 } from './keystore.ts';
 import { Kernel } from './kernel.ts';
+import { btcAmountSats, satsToBtcString, btcStringToSats, matchBtcTx, isBech32Address } from './btc.ts';
 
 let failures = 0;
 const check = (name: string, ok: boolean, detail = '') => {
@@ -59,6 +60,22 @@ try {
   rejected = true;
 }
 check('keystore rejects wrong password', rejected);
+
+// --- bitcoin helpers
+const sats = btcAmountSats(9, 60000, 7);
+check('btc amount = base + unique offset', sats > 15000n && sats - 15000n >= 1n && sats - 15000n <= 999n, String(sats));
+check('btc string roundtrip', btcStringToSats(satsToBtcString(123456789n)) === 123456789n && satsToBtcString(5n) === '0.00000005');
+const btcAddr = 'bc1quspfcg3k95lde05tfh0n798nz3k09v75j0zmvp';
+const txs = [
+  { txid: 'a', vout: [{ scriptpubkey_address: btcAddr, value: 15500 }], status: { confirmed: false } },
+  { txid: 'b', vout: [{ scriptpubkey_address: 'bc1qother', value: 15500 }], status: { confirmed: true } },
+  { txid: 'c', vout: [{ scriptpubkey_address: btcAddr, value: 15500 }], status: { confirmed: true } },
+  { txid: 'd', vout: [{ scriptpubkey_address: btcAddr, value: 15501 }], status: { confirmed: true } },
+];
+check('btc match skips mempool, wrong address, wrong amount', matchBtcTx(txs, btcAddr, 15500n, new Set()) === 'c');
+check('btc match skips consumed txid', matchBtcTx(txs, btcAddr, 15500n, new Set(['c'])) === null);
+check('btc mempool accepted when allowed', matchBtcTx(txs, btcAddr, 15500n, new Set(), false) === 'a');
+check('bech32 check', isBech32Address(btcAddr) && !isBech32Address('0xabc'));
 
 // --- wasm kernel via the TS wrapper, cross-checked against noble
 const wasm = await Deno.readFile(new URL('../kernel/cairn_kernel.wasm', import.meta.url));

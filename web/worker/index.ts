@@ -14,6 +14,7 @@ import { quoteForDifficulty, maskDifficulty, PRO } from '../src/lib/pricing';
 import { difficulty as patternDifficulty, matchesPattern, validatePattern, type Pattern } from '../src/lib/pattern';
 import { splitKeyAddress, create2Address, toChecksum, isValidPublicKey, isAddress, isBytes32Hex, strip0x } from '../src/lib/eth';
 import { secp256k1 } from '@noble/curves/secp256k1.js';
+import { btcAmountSats, satsToBtcString, btcStringToSats, matchBtcTx, type BtcTx } from '../src/lib/btc';
 
 export interface Env {
   DB: D1Database;
@@ -22,6 +23,8 @@ export interface Env {
   RPC_ETH: string;
   RPC_BASE: string;
   USDC_BASE: string;
+  BTC_ADDRESS?: string;
+  BTC_API: string;
   PAYMENT_XPUB?: string;
   WORKER_TOKEN?: string;
   ADMIN_TOKEN?: string;
@@ -64,11 +67,13 @@ type OrderRow = {
   result_address: string | null;
   refund_requested_at: number | null;
   refund_address: string | null;
+  pay_txid: string | null;
 };
 
 const app = new Hono<{ Bindings: Env }>();
 const now = () => Math.floor(Date.now() / 1000);
 const LEASE_SECONDS = 600;
+const parseAsset = (v: unknown): 'USDC' | 'ETH' | 'BTC' => (v === 'ETH' ? 'ETH' : v === 'BTC' ? 'BTC' : 'USDC');
 
 function randomToken(bytes = 24): string {
   const b = new Uint8Array(bytes);
@@ -145,13 +150,40 @@ function depositAddress(xpub: string, index: number): string {
   return bytesToHex(keccak_256(unc.subarray(1)).subarray(12));
 }
 
-async function ethUsd(): Promise<number> {
-  const r = await fetch('https://api.coinbase.com/v2/prices/ETH-USD/spot', { headers: { accept: 'application/json' } });
+async function spotUsd(pair: 'ETH-USD' | 'BTC-USD'): Promise<number> {
+  const r = await fetch(`https://api.coinbase.com/v2/prices/${pair}/spot`, { headers: { accept: 'application/json' } });
   if (!r.ok) throw new Error('price feed unavailable');
   const j = (await r.json()) as { data: { amount: string } };
   const v = Number(j.data.amount);
   if (!isFinite(v) || v <= 0) throw new Error('bad price');
   return v;
+}
+const ethUsd = () => spotUsd('ETH-USD');
+const btcUsd = () => spotUsd('BTC-USD');
+
+/** Scan recent transactions to the shared BTC address for an exact-amount, confirmed, unused payment. */
+async function btcPaidTxid(env: Env, row: OrderRow): Promise<string | null> {
+  if (!env.BTC_ADDRESS || !row.pay_amount) return null;
+  const r = await fetch(`${env.BTC_API}/address/${env.BTC_ADDRESS}/txs`, { headers: { accept: 'application/json' } });
+  if (!r.ok) throw new Error('btc api unavailable');
+  const txs = (await r.json()) as BtcTx[];
+  const { results } = await env.DB.prepare('SELECT pay_txid FROM orders WHERE pay_txid IS NOT NULL').all<{ pay_txid: string }>();
+  const used = new Set(results.map((x) => x.pay_txid));
+  return matchBtcTx(txs, env.BTC_ADDRESS, btcStringToSats(row.pay_amount), used, true);
+}
+
+/** Returns true (and records the txid / marks queued) when an order's payment has landed. */
+async function settleIfPaid(env: Env, row: OrderRow): Promise<boolean> {
+  if (row.pay_asset === 'BTC') {
+    const txid = await btcPaidTxid(env, row);
+    if (!txid) return false;
+    const r = await env.DB.prepare("UPDATE orders SET status = 'queued', paid_at = ?, pay_txid = ? WHERE id = ? AND status = 'awaiting_payment'").bind(now(), txid, row.id).run();
+    return !!r.meta.changes;
+  }
+  const have = await paidAmount(env, row);
+  if (have < (requiredUnits(row) * 99n) / 100n) return false;
+  const r = await env.DB.prepare("UPDATE orders SET status = 'queued', paid_at = ? WHERE id = ? AND status = 'awaiting_payment'").bind(now(), row.id).run();
+  return !!r.meta.changes;
 }
 
 async function rpc(url: string, method: string, params: unknown[]): Promise<string> {
@@ -177,7 +209,7 @@ async function paidAmount(env: Env, row: OrderRow): Promise<bigint> {
 
 function requiredUnits(row: OrderRow): bigint {
   const [whole, frac = ''] = (row.pay_amount ?? '0').split('.');
-  const decimals = row.pay_asset === 'ETH' ? 18 : 6;
+  const decimals = row.pay_asset === 'ETH' ? 18 : row.pay_asset === 'BTC' ? 8 : 6;
   return BigInt(whole + frac.padEnd(decimals, '0').slice(0, decimals));
 }
 
@@ -191,12 +223,7 @@ async function checkPayments(env: Env): Promise<number> {
       continue;
     }
     try {
-      const have = await paidAmount(env, row);
-      const need = requiredUnits(row);
-      if (have >= (need * 99n) / 100n) {
-        await env.DB.prepare("UPDATE orders SET status = 'queued', paid_at = ? WHERE id = ? AND status = 'awaiting_payment'").bind(t, row.id).run();
-        paid++;
-      }
+      if (await settleIfPaid(env, row)) paid++;
     } catch {
       // RPC hiccup; try again next run
     }
@@ -210,7 +237,7 @@ async function checkPayments(env: Env): Promise<number> {
 // Public API
 // ---------------------------------------------------------------------------
 
-app.get('/api/health', (c) => c.json({ ok: true, payments: !!c.env.PAYMENT_XPUB, workers: !!c.env.WORKER_TOKEN }));
+app.get('/api/health', (c) => c.json({ ok: true, payments: !!c.env.PAYMENT_XPUB || !!c.env.BTC_ADDRESS, evm: !!c.env.PAYMENT_XPUB, btc: !!c.env.BTC_ADDRESS, workers: !!c.env.WORKER_TOKEN }));
 
 app.get('/api/quote', (c) => {
   const q = c.req.query();
@@ -237,7 +264,9 @@ function publicOrder(row: OrderRow, siteUrl: string) {
     deployer: row.deployer,
     initCodeHash: row.init_code_hash,
     quote: { usd: row.quote_usd, difficulty: row.difficulty, expectedSeconds: row.expected_seconds },
-    payment: row.pay_address ? { asset: row.pay_asset, chain: row.pay_chain, amount: row.pay_amount, address: '0x' + toChecksum(row.pay_address), ethUsd: row.eth_usd } : null,
+    payment: row.pay_address
+      ? { asset: row.pay_asset, chain: row.pay_chain, amount: row.pay_amount, address: row.pay_asset === 'BTC' ? row.pay_address : '0x' + toChecksum(row.pay_address), rateUsd: row.eth_usd, ethUsd: row.pay_asset === 'ETH' ? row.eth_usd : null, txid: row.pay_txid }
+      : null,
     progress: { attempts: row.attempts, rate: row.rate, runningSeconds: running, overdueMultiple: row.expected_seconds > 0 ? running / row.expected_seconds : 0 },
     result: row.result_hex ? { hex: row.result_hex, address: row.result_address ? '0x' + toChecksum(row.result_address) : null } : null,
     emailSet: !!row.email,
@@ -252,7 +281,7 @@ async function createOrder(
   kind: OrderRow['kind'],
   target: Target,
   diff: number,
-  extra: { publicKey?: string; deployer?: string; initCodeHash?: string; email?: string; apiKeyId?: number; postpaid?: boolean; payAsset?: 'USDC' | 'ETH'; fixedUsd?: number },
+  extra: { publicKey?: string; deployer?: string; initCodeHash?: string; email?: string; apiKeyId?: number; postpaid?: boolean; payAsset?: 'USDC' | 'ETH' | 'BTC'; fixedUsd?: number },
 ): Promise<OrderRow> {
   const quote = extra.fixedUsd != null ? { ...quoteForDifficulty(1), usd: extra.fixedUsd, expectedSeconds: 0, tooLarge: false } : quoteForDifficulty(diff);
   if (quote.tooLarge) throw new Error('target too large for online ordering; contact Teams');
@@ -265,16 +294,30 @@ async function createOrder(
   let eth: number | null = null;
   let status = 'queued';
   if (!extra.postpaid) {
-    if (!env.PAYMENT_XPUB) throw new Error('payments are not configured yet');
     status = 'awaiting_payment';
     const seq = await env.DB.prepare('SELECT COALESCE(MAX(pay_index), 0) + 1 AS n FROM orders').first<{ n: number }>();
     payIndex = seq?.n ?? 1;
-    payAddress = depositAddress(env.PAYMENT_XPUB, payIndex);
-    if (payAsset === 'ETH') {
-      eth = await ethUsd();
-      payAmount = (quote.usd / eth).toFixed(6);
+    if (payAsset === 'BTC') {
+      if (!env.BTC_ADDRESS) throw new Error('bitcoin payments are not configured');
+      payAddress = env.BTC_ADDRESS;
+      eth = await btcUsd();
+      let sats = btcAmountSats(quote.usd, eth, payIndex);
+      // guarantee a unique amount among orders still awaiting payment
+      for (let i = 0; i < 50; i++) {
+        const clash = await env.DB.prepare("SELECT id FROM orders WHERE pay_asset = 'BTC' AND status = 'awaiting_payment' AND pay_amount = ?").bind(satsToBtcString(sats)).first();
+        if (!clash) break;
+        sats += 1n;
+      }
+      payAmount = satsToBtcString(sats);
     } else {
-      payAmount = quote.usd.toFixed(2);
+      if (!env.PAYMENT_XPUB) throw new Error('EVM payments are not configured yet; bitcoin is available');
+      payAddress = depositAddress(env.PAYMENT_XPUB, payIndex);
+      if (payAsset === 'ETH') {
+        eth = await ethUsd();
+        payAmount = (quote.usd / eth).toFixed(6);
+      } else {
+        payAmount = quote.usd.toFixed(2);
+      }
     }
   }
   await env.DB.prepare(
@@ -300,7 +343,7 @@ async function createOrder(
       quote.expectedSeconds,
       quote.usd,
       extra.postpaid ? null : payAsset,
-      extra.postpaid ? null : payAsset === 'ETH' ? 'ethereum' : 'base',
+      extra.postpaid ? null : payAsset === 'ETH' ? 'ethereum' : payAsset === 'BTC' ? 'bitcoin' : 'base',
       payAmount,
       payAddress,
       payIndex,
@@ -321,7 +364,7 @@ app.post('/api/orders', async (c) => {
   if (typeof parsed === 'string') return bad(c, parsed);
   const pubHex = strip0x(String(body.publicKey ?? '')).toLowerCase();
   if (!/^04[0-9a-f]{128}$/.test(pubHex) || !isValidPublicKey(hexToBytes(pubHex))) return bad(c, 'publicKey must be a valid uncompressed secp256k1 public key');
-  const payAsset = body.payAsset === 'ETH' ? 'ETH' : 'USDC';
+  const payAsset = parseAsset(body.payAsset);
   const email = typeof body.email === 'string' && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(body.email) ? body.email.trim() : undefined;
   try {
     const row = await createOrder(c.env, 'split', parsed.target, parsed.difficulty, { publicKey: pubHex, payAsset, email });
@@ -336,7 +379,7 @@ app.post('/api/orders/sharecard', async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as { payAsset?: string };
   try {
     const row = await createOrder(c.env, 'sharecard', { pattern: { prefix: '', suffix: '', caseSensitive: false }, maskHex: null, valueHex: null }, 1, {
-      payAsset: body.payAsset === 'ETH' ? 'ETH' : 'USDC',
+      payAsset: parseAsset(body.payAsset),
       fixedUsd: 3,
     });
     return c.json(publicOrder(row, c.env.SITE_URL), 201);
@@ -349,11 +392,9 @@ app.get('/api/orders/:token', async (c) => {
   const row = await c.env.DB.prepare('SELECT * FROM orders WHERE token = ?').bind(c.req.param('token')).first<OrderRow>();
   if (!row) return bad(c, 'not found', 404);
   // opportunistic payment check for the order being viewed
-  if (row.status === 'awaiting_payment' && c.env.PAYMENT_XPUB) {
+  if (row.status === 'awaiting_payment') {
     try {
-      const have = await paidAmount(c.env, row);
-      if (have >= (requiredUnits(row) * 99n) / 100n) {
-        await c.env.DB.prepare("UPDATE orders SET status = 'queued', paid_at = ? WHERE id = ? AND status = 'awaiting_payment'").bind(now(), row.id).run();
+      if (await settleIfPaid(c.env, row)) {
         row.status = 'queued';
         row.paid_at = now();
       }
@@ -424,7 +465,7 @@ app.post('/api/v1/jobs', async (c) => {
       initCodeHash,
       apiKeyId: key.id,
       postpaid: key.postpaid === 1,
-      payAsset: body.payAsset === 'ETH' ? 'ETH' : 'USDC',
+      payAsset: parseAsset(body.payAsset),
     });
     return c.json(publicOrder(row, c.env.SITE_URL), 201);
   } catch (e) {

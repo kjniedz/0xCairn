@@ -49,7 +49,7 @@ function Teams() {
 
       <section class="section" id="api">
         <h2>API</h2>
-        <p>One endpoint to submit, one to poll. Authenticate with a Bearer API key. Jobs are priced by difficulty exactly like Pro; prepaid keys receive a USDC or ETH payment address per job, postpaid keys are invoiced monthly.</p>
+        <p>One endpoint to submit, one to poll. Authenticate with a Bearer API key. Jobs are priced by difficulty exactly like Pro; prepaid keys receive a USDC, ETH or BTC payment request per job, postpaid keys are invoiced monthly.</p>
         <pre class="code">{`# quote
 curl "${SITE.url}/api/v1/quote?prefix=00000000" -H "Authorization: Bearer $CAIRN_API_KEY"
 

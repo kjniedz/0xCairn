@@ -18,4 +18,6 @@ export const SITE = {
   },
   /** Mined with 0xCairn. Replaced by scripts/mine-tip.mjs output. */
   tipAddress: 'ca148145d27476b0fa36718999880f3adee06ca1',
+  /** Bitcoin tips (also the receiving address for BTC payments). */
+  tipBtc: 'bc1quspfcg3k95lde05tfh0n798nz3k09v75j0zmvp',
 } as const;

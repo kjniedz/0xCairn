@@ -30,17 +30,20 @@ function Pro() {
   const [step, setStep] = useState<Step>('quote');
   const [half, setHalf] = useState<{ priv: string; pub: string } | null>(null);
   const [reveal, setReveal] = useState(false);
-  const [asset, setAsset] = useState<'USDC' | 'ETH'>('USDC');
+  const [asset, setAsset] = useState<'USDC' | 'ETH' | 'BTC'>('USDC');
   const [email, setEmail] = useState('');
   const [order, setOrder] = useState<Record<string, any> | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [health, setHealth] = useState<{ payments: boolean } | null>(null);
+  const [health, setHealth] = useState<{ payments: boolean; evm?: boolean; btc?: boolean } | null>(null);
 
   useEffect(() => {
     fetch('/api/health')
       .then((r) => r.json())
-      .then((h) => setHealth(h))
+      .then((h) => {
+        setHealth(h);
+        if (!h.evm && h.btc) setAsset('BTC');
+      })
       .catch(() => setHealth({ payments: false }));
   }, []);
 
@@ -134,7 +137,7 @@ function Pro() {
                     <div class="k">Price</div>
                     <div class="v">
                       ${quote.usd.toFixed(2)}
-                      <small>USDC on Base or ETH</small>
+                      <small>USDC on Base, ETH, or BTC</small>
                     </div>
                   </div>
                   <div class="stat">
@@ -211,11 +214,14 @@ function Pro() {
                   <div class="field">
                     <span class="label">Pay with</span>
                     <div class="actions">
-                      <button type="button" class={`btn ${asset === 'USDC' ? 'primary' : ''}`} onClick={() => setAsset('USDC')}>
+                      <button type="button" class={`btn ${asset === 'USDC' ? 'primary' : ''}`} disabled={health != null && !health.evm} onClick={() => setAsset('USDC')}>
                         USDC on Base
                       </button>
-                      <button type="button" class={`btn ${asset === 'ETH' ? 'primary' : ''}`} onClick={() => setAsset('ETH')}>
+                      <button type="button" class={`btn ${asset === 'ETH' ? 'primary' : ''}`} disabled={health != null && !health.evm} onClick={() => setAsset('ETH')}>
                         ETH on Ethereum
+                      </button>
+                      <button type="button" class={`btn ${asset === 'BTC' ? 'primary' : ''}`} onClick={() => setAsset('BTC')}>
+                        BTC
                       </button>
                     </div>
                   </div>
@@ -227,7 +233,8 @@ function Pro() {
                     <div class="field-help">Never required. The order page works without it.</div>
                   </div>
                 </div>
-                {health && !health.payments && <div class="note warn">Payments are not switched on yet on this deployment. Orders cannot be placed until the operator configures a deposit xpub.</div>}
+                {health && !health.payments && <div class="note warn">Payments are not switched on yet on this deployment.</div>}
+                {health && health.payments && !health.evm && <div class="note">USDC and ETH checkout are not enabled yet on this deployment; Bitcoin is.</div>}
                 {error && <div class="note danger">{error}</div>}
                 <div class="actions">
                   <button type="button" class="btn primary" disabled={busy || !quote || (health != null && !health.payments)} onClick={placeOrder}>
@@ -284,9 +291,11 @@ function Pro() {
 function Payment({ order }: { order: Record<string, any> }) {
   const pay = order.payment;
   const uri = pay
-    ? pay.asset === 'ETH'
-      ? `ethereum:${pay.address}@1?value=${BigInt(Math.round(Number(pay.amount) * 1e6)) * 1000000000000n}`
-      : `ethereum:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913@8453/transfer?address=${pay.address}&uint256=${BigInt(Math.round(Number(pay.amount) * 1e6))}`
+    ? pay.asset === 'BTC'
+      ? `bitcoin:${pay.address}?amount=${pay.amount}`
+      : pay.asset === 'ETH'
+        ? `ethereum:${pay.address}@1?value=${BigInt(Math.round(Number(pay.amount) * 1e6)) * 1000000000000n}`
+        : `ethereum:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913@8453/transfer?address=${pay.address}&uint256=${BigInt(Math.round(Number(pay.amount) * 1e6))}`
     : '';
   const m = useMemo(() => (uri ? qrMatrix(uri, 'L') : null), [uri]);
   return (
@@ -300,23 +309,23 @@ function Payment({ order }: { order: Record<string, any> }) {
             <div class="kv">
               <div class="k">
                 <span>
-                  Send exactly {pay.amount} {pay.asset} on {pay.chain === 'base' ? 'Base' : 'Ethereum mainnet'}
+                  Send exactly {pay.amount} {pay.asset} on {pay.chain === 'base' ? 'Base' : pay.chain === 'bitcoin' ? 'Bitcoin' : 'Ethereum mainnet'}
                 </span>
                 <CopyButton text={pay.amount} label="Copy amount" />
               </div>
               <div class="v">
                 {pay.amount} {pay.asset}
-                {pay.ethUsd ? <small style={{ color: 'var(--muted)' }}> · ETH at ${Number(pay.ethUsd).toFixed(2)}, rate locked for this order</small> : null}
+                {pay.rateUsd && pay.asset !== 'USDC' ? <small style={{ color: 'var(--muted)' }}> · {pay.asset} at ${Number(pay.rateUsd).toFixed(2)}, rate locked for this order</small> : null}
               </div>
             </div>
             <div class="kv">
               <div class="k">
-                <span>To this address (unique to your order)</span>
+                <span>{pay.asset === 'BTC' ? 'To this address (the amount is unique to your order)' : 'To this address (unique to your order)'}</span>
                 <CopyButton text={pay.address} />
               </div>
               <div class="v">{pay.address}</div>
               <div class="warn">
-                {pay.asset === 'USDC' ? 'USDC on Base only. Sending on another chain or another token cannot be detected.' : 'ETH on Ethereum mainnet only. Payments on L2s are not detected for ETH orders.'} The order expires if unpaid after {PRO.paymentWindowHours} hours.
+                {pay.asset === 'USDC' ? 'USDC on Base only. Sending on another chain or another token cannot be detected.' : pay.asset === 'BTC' ? 'Send the exact amount shown, including the last satoshis: that is how we match your payment to this order. Detected after one confirmation.' : 'ETH on Ethereum mainnet only. Payments on L2s are not detected for ETH orders.'} The order expires if unpaid after {PRO.paymentWindowHours} hours.
               </div>
             </div>
             <p style={{ fontSize: '13.5px', color: 'var(--text-2)' }}>We check the chain every few minutes. Once the payment lands the job enters the GPU queue and your order page updates from "awaiting payment" to "queued" and then "mining". You can close this tab.</p>
@@ -331,7 +340,7 @@ function Payment({ order }: { order: Record<string, any> }) {
               <svg class="qr" viewBox={`0 0 ${m.size} ${m.size}`} shape-rendering="crispEdges" role="img" aria-label="Payment QR code">
                 <path d={m.path} fill="#000" />
               </svg>
-              <span style={{ fontSize: '12px', color: 'var(--muted)' }}>EIP-681 payment request</span>
+              <span style={{ fontSize: '12px', color: 'var(--muted)' }}>{pay.asset === 'BTC' ? 'BIP-21 payment request' : 'EIP-681 payment request'}</span>
             </div>
           )}
         </div>

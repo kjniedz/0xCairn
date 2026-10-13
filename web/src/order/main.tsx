@@ -93,13 +93,13 @@ function OrderPage() {
                 <div class="kv">
                   <div class="k">
                     <span>
-                      Send {order.payment.amount} {order.payment.asset} on {order.payment.chain === 'base' ? 'Base' : 'Ethereum mainnet'} to
+                      Send exactly {order.payment.amount} {order.payment.asset} on {order.payment.chain === 'base' ? 'Base' : order.payment.chain === 'bitcoin' ? 'Bitcoin' : 'Ethereum mainnet'} to
                     </span>
                     <CopyButton text={order.payment.address} />
                   </div>
                   <div class="v">{order.payment.address}</div>
                   <div class="warn">
-                    Unique to this order. Checked every few minutes. Expires {new Date(order.expiresAt * 1000).toLocaleString()} if unpaid.
+                    {order.payment.asset === 'BTC' ? 'The exact amount (down to the satoshi) identifies your order. Detected after one confirmation.' : 'Unique to this order.'} Checked every few minutes. Expires {new Date(order.expiresAt * 1000).toLocaleString()} if unpaid.
                   </div>
                 </div>
               </div>

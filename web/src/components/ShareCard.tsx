@@ -50,7 +50,7 @@ export function ShareCard({ result }: { result: SearchResult }) {
     previewRef.current.replaceChildren(c);
   }, [open, style, unlocked, result.checksummed]);
 
-  async function buy(asset: 'USDC' | 'ETH') {
+  async function buy(asset: 'USDC' | 'ETH' | 'BTC') {
     setBusy(true);
     setErr(null);
     try {
@@ -91,7 +91,7 @@ export function ShareCard({ result }: { result: SearchResult }) {
           {!unlocked && (
             <div class="note" style={{ display: 'grid', gap: '8px' }}>
               <span>
-                <b>Clean version:</b> no watermark, 3× resolution, three styles, for $3 in USDC on Base or ETH. One purchase unlocks it for every address in this browser.
+                <b>Clean version:</b> no watermark, 3× resolution, three styles, for $3 in USDC on Base, ETH or BTC. One purchase unlocks it for every address in this browser.
               </span>
               {!order ? (
                 <div class="actions">
@@ -100,6 +100,9 @@ export function ShareCard({ result }: { result: SearchResult }) {
                   </button>
                   <button type="button" class="btn sm" disabled={busy} onClick={() => buy('ETH')}>
                     Pay in ETH
+                  </button>
+                  <button type="button" class="btn sm" disabled={busy} onClick={() => buy('BTC')}>
+                    Pay in BTC
                   </button>
                   {err && <span class="field-error">{err}</span>}
                 </div>

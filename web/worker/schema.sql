@@ -38,7 +38,8 @@ CREATE TABLE IF NOT EXISTS orders (
   result_hex TEXT,                    -- offset (split) or salt (create2)
   result_address TEXT,
   refund_requested_at INTEGER,
-  refund_address TEXT
+  refund_address TEXT,
+  pay_txid TEXT                       -- bitcoin: txid consumed by this order
 );
 CREATE INDEX IF NOT EXISTS orders_status ON orders(status, created_at);
 
