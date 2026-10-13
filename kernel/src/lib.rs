@@ -288,6 +288,11 @@ impl Miner {
         Some((k.to_bytes().into(), addr))
     }
 
+    /// Address currently held by lane 0 (used for the live preview).
+    pub fn sample_address(&self) -> [u8; 20] {
+        address_of_xy(&self.xs[0], &self.ys[0])
+    }
+
     /// Export all lane coordinates as big-endian x||y (64 bytes per lane).
     pub fn export_lanes(&self) -> Vec<u8> {
         let mut out = Vec::with_capacity(self.n * 64);
@@ -322,6 +327,16 @@ impl Create2 {
         buf[21..53].copy_from_slice(salt_seed);
         buf[53..85].copy_from_slice(init_hash);
         Create2 { buf, salt: *salt_seed, attempts: 0, found: None }
+    }
+
+    /// Address of the salt that would be tried next (used for the live preview).
+    pub fn sample_address(&self) -> [u8; 20] {
+        let mut buf = self.buf;
+        buf[21..53].copy_from_slice(&self.salt);
+        let h = keccak256(&buf);
+        let mut a = [0u8; 20];
+        a.copy_from_slice(&h[12..]);
+        a
     }
 
     pub fn mine(&mut self, count: u32, pat: &Pattern) -> bool {
@@ -465,6 +480,34 @@ pub extern "C" fn miner_found() -> u32 {
             let io = io();
             io[..32].copy_from_slice(&k);
             io[32..52].copy_from_slice(&a);
+            1
+        }
+        None => 0,
+    }
+}
+
+/// Writes IO[0..20] = address currently held by lane 0. Returns 1 if available.
+#[no_mangle]
+#[allow(static_mut_refs)]
+pub extern "C" fn miner_sample() -> u32 {
+    match unsafe { MINER.as_ref() } {
+        Some(m) => {
+            let a = m.sample_address();
+            io()[..20].copy_from_slice(&a);
+            1
+        }
+        None => 0,
+    }
+}
+
+/// Writes IO[0..20] = address of the next CREATE2 salt. Returns 1 if available.
+#[no_mangle]
+#[allow(static_mut_refs)]
+pub extern "C" fn create2_sample() -> u32 {
+    match unsafe { CREATE2.as_ref() } {
+        Some(c) => {
+            let a = c.sample_address();
+            io()[..20].copy_from_slice(&a);
             1
         }
         None => 0,

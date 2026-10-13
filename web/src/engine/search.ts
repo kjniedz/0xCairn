@@ -30,6 +30,8 @@ export class SearchController {
   private emitTimer: number | null = null;
   private workersWanted: number;
   private seenSecrets = new Set<string>();
+  private sample: Uint8Array | null = null;
+  private benching = false;
 
   engines: EngineStats = {
     cpu: { workers: 0, ready: false, benchRate: null, liveRate: 0 },
@@ -43,8 +45,9 @@ export class SearchController {
       this.cpuAttempts = attempts;
       this.onCandidate(c);
     };
-    this.pool.onProgress = (a) => {
+    this.pool.onProgress = (a, sample) => {
       this.cpuAttempts = a;
+      if (sample) this.sample = sample;
       this.scheduleEmit();
     };
     this.pool.onError = (m) => this.fail(`CPU worker error: ${m}`);
@@ -95,7 +98,7 @@ export class SearchController {
       const probe = await this.gpu.probe();
       this.engines.gpu.available = probe.available;
       this.engines.gpu.enabled = probe.available;
-      this.engines.gpu.description = probe.description;
+      this.engines.gpu.description = formatGpuName(probe.description);
       this.engines.gpu.benchRate = probe.benchRate;
       this.engines.gpu.error = probe.error;
     } catch (e) {
@@ -106,6 +109,29 @@ export class SearchController {
       this.engines.gpu.checking = false;
       this.emit();
     }
+  }
+
+  /** Re-run the CPU and GPU benchmarks (about 3 seconds). */
+  async rebench(): Promise<void> {
+    if (this.status === 'running' || this.status === 'starting' || this.benching) return;
+    this.benching = true;
+    this.emit();
+    try {
+      if (this.pool.size !== this.workersWanted) await this.pool.setSize(this.workersWanted);
+      this.engines.cpu.benchRate = await this.pool.bench(1500);
+      this.emit();
+      if (this.engines.gpu.available && this.gpu) {
+        const probe = await this.gpu.probe(1200);
+        if (probe.available) this.engines.gpu.benchRate = probe.benchRate;
+      }
+    } finally {
+      this.benching = false;
+      this.emit();
+    }
+  }
+
+  get isBenching(): boolean {
+    return this.benching;
   }
 
   setGpuEnabled(on: boolean): void {
@@ -148,6 +174,7 @@ export class SearchController {
     this.rateWindow = [];
     this.cpuLive = 0;
     this.gpuLive = 0;
+    this.sample = null;
     this.status = 'starting';
     this.emit();
     try {
@@ -310,10 +337,24 @@ export class SearchController {
       results: this.results,
       error: this.error,
       verificationFailures: this.verificationFailures,
+      sample: this.sample,
       engines: {
         cpu: { ...this.engines.cpu, workers: this.workersWanted, liveRate: running ? this.cpuLive : 0 },
         gpu: { ...this.engines.gpu, liveRate: running ? this.gpuLive : 0 },
       },
     };
   }
+}
+
+/** "apple apple metal-3" -> "Apple GPU (Metal 3)"; "nvidia ..." -> "NVIDIA GPU"; dedupes repeated words. */
+export function formatGpuName(raw: string): string {
+  const words = raw.toLowerCase().split(/\s+/).filter(Boolean);
+  const uniq = [...new Set(words)];
+  if (!uniq.length) return '';
+  const vendorMap: Record<string, string> = { apple: 'Apple', nvidia: 'NVIDIA', amd: 'AMD', intel: 'Intel', qualcomm: 'Qualcomm', arm: 'Arm', google: 'Google' };
+  const vendor = uniq.map((w) => vendorMap[w]).find(Boolean);
+  const rest = uniq.filter((w) => !vendorMap[w] && !['gpu', 'inc', 'corporation', 'corp'].includes(w)).map((w) => w.replace(/-(\d)/, ' $1'));
+  const detail = rest.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  if (vendor) return detail ? `${vendor} GPU (${detail})` : `${vendor} GPU`;
+  return detail ? detail.charAt(0).toUpperCase() + detail.slice(1) : 'WebGPU device';
 }

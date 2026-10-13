@@ -80,6 +80,18 @@ export function formatDuration(seconds: number): string {
   return 'under a second';
 }
 
+/** Compact duration for chips: <1s, 4s, 3m, 2h, 5d, 3y. */
+export function formatDurationShort(seconds: number): string {
+  if (!isFinite(seconds)) return 'never';
+  if (seconds < 1) return '<1s';
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
+  if (seconds < 86400) return `${Math.round(seconds / 3600)}h`;
+  if (seconds < 365 * 86400) return `${Math.round(seconds / 86400)}d`;
+  const y = seconds / (365 * 86400);
+  return y >= 1000 ? `${formatBig(y)}y` : `${Math.round(y)}y`;
+}
+
 export function formatBig(n: number): string {
   if (!isFinite(n)) return 'infinite';
   if (n < 1e6) return Math.round(n).toLocaleString('en-US');

@@ -5,6 +5,7 @@ import { qrMatrix } from '../lib/qr';
 import { encryptKeystoreV3, keystoreFilename } from '../lib/keystore';
 import { hexToBytes } from '../lib/eth';
 import { normalizePattern, formatBig } from '../lib/pattern';
+import { SITE } from '../site';
 
 const CHAINS = ['Ethereum', 'Base', 'Arbitrum', 'Optimism', 'Polygon', 'BNB Chain', 'Avalanche', 'zkSync', 'Scroll', 'Linea', 'Gnosis', '+ every EVM chain'];
 
@@ -76,20 +77,20 @@ export function ResultCard({ result, onDismiss }: { result: SearchResult; onDism
       <div class="result-head">
         <h3>{result.kind === 'create2' ? 'Contract address found' : result.kind === 'split' ? 'Offset found' : 'Address found'}</h3>
         <span class="meta">
-          {result.engine} · {formatBig(result.attempts)} attempts · verified ✓
+          {result.engine === 'local' ? 'combined locally' : `${result.engine} · ${formatBig(result.attempts)} attempts`} · verified twice
         </span>
         {onDismiss && (
-          <button type="button" class="btn sm ghost" onClick={onDismiss} aria-label="Dismiss result">
+          <button type="button" class="btn xs ghost" onClick={onDismiss} aria-label="Dismiss result">
             ✕
           </button>
         )}
       </div>
 
       <div class="result-grid">
-        <div style={{ display: 'grid', gap: '14px', minWidth: 0 }}>
+        <div style={{ display: 'grid', gap: '16px', minWidth: 0 }}>
           <div class="kv">
             <div class="k">
-              <span>{result.kind === 'create2' ? 'Contract address (checksummed)' : 'Address (checksummed)'}</span>
+              <span>{result.kind === 'create2' ? 'Contract address' : 'Address'} · EIP-55 checksummed</span>
               <CopyButton text={address} />
             </div>
             <div class="v">
@@ -102,7 +103,7 @@ export function ResultCard({ result, onDismiss }: { result: SearchResult; onDism
               <span>{secretLabel}</span>
               <span style={{ display: 'inline-flex', gap: '6px' }}>
                 {revealed && <CopyButton text={secretHex} />}
-                <button type="button" class="btn sm" onClick={() => setRevealed((r) => !r)}>
+                <button type="button" class="btn xs" onClick={() => setRevealed((r) => !r)}>
                   {revealed ? 'Hide' : 'Reveal'}
                 </button>
               </span>
@@ -110,40 +111,19 @@ export function ResultCard({ result, onDismiss }: { result: SearchResult; onDism
             <div class={`v secret ${revealed ? '' : 'hidden'}`} onClick={() => !revealed && setRevealed(true)} role={revealed ? undefined : 'button'} tabIndex={revealed ? -1 : 0}>
               {secretHex}
             </div>
+            {isKey && <div class="warn">Anyone holding this key controls the address on every chain. Never paste it anywhere you did not generate it.</div>}
           </div>
-
-          {result.kind !== 'create2' && (
-            <div class="chips" title="One private key controls the same address on every EVM-compatible network">
-              {CHAINS.map((c) => (
-                <span class="chip" key={c}>
-                  {c}
-                </span>
-              ))}
-            </div>
-          )}
-          {result.kind === 'create2' && (
-            <p style={{ fontSize: '13px', color: 'var(--muted)' }}>
-              Deploy through the same factory with this salt and the exact init code you hashed, and the contract will live at this address on any EVM chain where that factory exists at the same address.
-            </p>
-          )}
-          {result.kind === 'split' && (
-            <p style={{ fontSize: '13px', color: 'var(--muted)' }}>
-              This offset is useless on its own. Only the requester, who holds the matching private key, can combine it into the final key in step 3.
-            </p>
-          )}
 
           {isKey && (
             <div class="actions">
-              <button type="button" class="btn" onClick={() => setShowKeystore((s) => !s)}>
-                Download encrypted keystore (V3 JSON)
+              <button type="button" class="btn primary" onClick={() => setShowKeystore((s) => !s)}>
+                Download encrypted keystore
               </button>
+              <span style={{ fontSize: '12.5px', color: 'var(--muted)' }}>V3 JSON, scrypt + AES-128-CTR. Imports into MetaMask, Rabby, geth and most wallets.</span>
             </div>
           )}
           {isKey && showKeystore && (
             <div class="inline-form">
-              <div style={{ fontSize: '13px', color: 'var(--muted)' }}>
-                Encrypts the private key with scrypt + AES-128-CTR in the standard Web3 keystore format that geth, MetaMask and most wallets import. The file is only as strong as this password.
-              </div>
               <div class="row">
                 <div class="input-wrap full">
                   <input type="password" placeholder="Password (8+ characters)" value={pw} autoComplete="new-password" onInput={(e) => setPw((e.target as HTMLInputElement).value)} />
@@ -155,7 +135,44 @@ export function ResultCard({ result, onDismiss }: { result: SearchResult; onDism
                   {busy == null ? 'Encrypt + download' : `Encrypting ${Math.round(busy * 100)}%`}
                 </button>
               </div>
+              <div class="field-help" style={{ marginTop: 0 }}>
+                The file is only as strong as this password. Store it in more than one place.
+              </div>
               {ksError && <div class="field-error">{ksError}</div>}
+            </div>
+          )}
+
+          {result.kind !== 'create2' && (
+            <div class="chips" title="One private key controls the same address on every EVM-compatible network">
+              {CHAINS.map((c) => (
+                <span class="chip-static" key={c}>
+                  {c}
+                </span>
+              ))}
+            </div>
+          )}
+          {result.kind === 'create2' && (
+            <p style={{ fontSize: '13px', color: 'var(--text-2)' }}>
+              Deploy through the same factory with this salt and the exact init code you hashed. The contract lands on this address on any EVM chain where the factory lives at the same address.
+            </p>
+          )}
+          {result.kind === 'split' && (
+            <p style={{ fontSize: '13px', color: 'var(--text-2)' }}>
+              This offset is useless on its own. Only the requester, who holds the matching private key, can combine it into the final key in step 3.
+            </p>
+          )}
+
+          {isKey && (
+            <div class="hw-line">
+              Funding this address? Import the keystore into a hardware wallet such as{' '}
+              <a href={SITE.affiliate.ledger} rel="noopener sponsored" target="_blank">
+                Ledger
+              </a>{' '}
+              or{' '}
+              <a href={SITE.affiliate.trezor} rel="noopener sponsored" target="_blank">
+                Trezor
+              </a>{' '}
+              so the key never sits in a browser again.
             </div>
           )}
         </div>
@@ -164,7 +181,7 @@ export function ResultCard({ result, onDismiss }: { result: SearchResult; onDism
           <Qr text={qrSecret ? secretHex : address} label={qrSecret ? 'Private key QR code' : 'Address QR code'} />
           <span style={{ fontSize: '12px', color: 'var(--muted)' }}>{qrSecret ? secretLabel : 'Address'}</span>
           {isKey && revealed && (
-            <button type="button" class="btn sm" onClick={() => setQrSecret((s) => !s)}>
+            <button type="button" class="btn xs" onClick={() => setQrSecret((s) => !s)}>
               {qrSecret ? 'Show address QR' : 'Show private key QR'}
             </button>
           )}

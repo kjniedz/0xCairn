@@ -83,10 +83,11 @@ export function Create2Tab({ snap, controller, pattern, setPattern }: Props) {
         <textarea id="initcode" class="text" placeholder="0x6080604052…  creation bytecode including encoded constructor arguments" spellcheck={false} value={initCode} disabled={busy} onInput={(e) => setInitCode((e.target as HTMLTextAreaElement).value)} />
       </div>
 
-      <PatternFields pattern={pattern} onChange={setPattern} disabled={busy} subject="contract address" />
+      <PatternFields pattern={pattern} onChange={setPattern} disabled={busy} subject="contract address" rate={controller.estimatedRate()} />
       <DifficultyPanel pattern={pattern} rate={rate} live={live} />
-      <EnginePanel snap={snap} controller={controller} />
       <RunControls snap={snap} controller={controller} pattern={pattern} onStart={start} formError={formError} />
+      <hr class="divider" />
+      <EnginePanel snap={snap} controller={controller} />
     </div>
   );
 }

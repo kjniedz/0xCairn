@@ -1,4 +1,5 @@
 import { render } from 'preact';
+import '@fontsource-variable/montserrat';
 import './styles.css';
 import { App } from './app';
 

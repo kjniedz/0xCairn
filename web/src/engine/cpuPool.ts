@@ -15,7 +15,7 @@ interface Slot {
 export class CpuPool {
   private slots: Slot[] = [];
   onFound: ((c: Candidate, attempts: number) => void) | null = null;
-  onProgress: ((attempts: number) => void) | null = null;
+  onProgress: ((attempts: number, sample?: Uint8Array) => void) | null = null;
   onError: ((message: string) => void) | null = null;
   private active = 0;
 
@@ -70,7 +70,7 @@ export class CpuPool {
     switch (m.type) {
       case 'progress':
         slot.attempts = m.attempts;
-        this.onProgress?.(this.attempts);
+        this.onProgress?.(this.attempts, m.sample);
         break;
       case 'found':
         slot.attempts = m.attempts;

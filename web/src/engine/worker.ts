@@ -65,7 +65,8 @@ function tick(gen: number): void {
     if (f) post({ type: 'found', key: f.key, address: f.address, attempts: attempts() });
     lastProgress = now;
   } else if (now - lastProgress > 200) {
-    post({ type: 'progress', attempts: attempts() });
+    const sample = (job.kind === 'address' ? kernel.sample() : kernel.create2Sample()) ?? undefined;
+    post({ type: 'progress', attempts: attempts(), sample });
     lastProgress = now;
   }
   setTimeout(() => tick(gen), 0);

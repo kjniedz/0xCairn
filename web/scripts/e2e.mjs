@@ -85,7 +85,7 @@ try {
   await page.waitForFunction(() => document.querySelector('.status-line')?.textContent.includes('Mining'), { timeout: 20000 });
   await new Promise((r) => setTimeout(r, 1500));
   await page.screenshot({ path: '/tmp/cairn-mining.png', fullPage: true });
-  const liveRate = await page.$eval('.status-line .mono', (el) => el.textContent);
+  const liveRate = await page.$eval('.runstats .stat .v', (el) => el.textContent);
   check('live attempts counter running', /\d/.test(liveRate), liveRate);
   for (const b of await page.$$('.actions .btn')) {
     if ((await b.evaluate((el) => el.textContent)).trim() === 'Pause') await b.click();
@@ -115,7 +115,7 @@ try {
   check('result address matches pattern', /^0xabc.*9$/i.test(addr), addr);
   check('result marked verified', (await page.$eval('.result .meta', (el) => el.textContent)).includes('verified'));
   // reveal key and re-derive in page using the app's own noble bundle is not exposed; re-derive here via a fresh page module instead
-  await page.click('.result .kv:nth-of-type(2) .btn.sm');
+  await page.click('.result .kv:nth-of-type(2) .btn.xs');
   const key = await page.$eval('.result .kv:nth-of-type(2) .v', (el) => el.textContent.trim());
   check('private key revealed (66 chars)', /^0x[0-9a-f]{64}$/.test(key), key.slice(0, 10) + '…');
   check('status shows match found', (await page.$eval('.status-line', (el) => el.textContent)).includes('Match found'));

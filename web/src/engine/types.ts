@@ -39,7 +39,7 @@ export type WorkerIn =
 
 export type WorkerOut =
   | { type: 'ready' }
-  | { type: 'progress'; attempts: number }
+  | { type: 'progress'; attempts: number; sample?: Uint8Array }
   | { type: 'found'; key: Uint8Array; address: Uint8Array; attempts: number }
   | { type: 'bench'; rate: number }
   | { type: 'error'; message: string };
@@ -89,4 +89,6 @@ export interface SearchSnapshot {
   error: string | null;
   verificationFailures: number;
   engines: EngineStats;
+  /** A recently checked candidate address (20 bytes), for the live preview. */
+  sample: Uint8Array | null;
 }

@@ -1,33 +1,45 @@
+import { useState } from 'preact/hooks';
 import type { Pattern } from '../lib/pattern';
 import { validatePattern, hexCount, letterCount, caseMultiplier, formatBig } from '../lib/pattern';
+import { DEFAULT_CHAIN } from '../chains/evm';
+import { HexspeakFinder } from './HexspeakFinder';
 
 interface Props {
   pattern: Pattern;
   onChange: (p: Pattern) => void;
   disabled?: boolean;
-  /** Label for the thing being matched, e.g. "address" or "contract address". */
   subject?: string;
+  rate?: number | null;
+  /** Controlled finder visibility (so presets can open it). */
+  finderOpen?: boolean;
+  onFinderToggle?: (open: boolean) => void;
 }
 
-function cleanHex(v: string): string {
-  return v.replace(/^0x/i, '').replace(/[^0-9a-fA-F]/g, '').slice(0, 40);
-}
-
-export function PatternFields({ pattern, onChange, disabled, subject = 'address' }: Props) {
+export function PatternFields({ pattern, onChange, disabled, subject = 'address', rate = null, finderOpen, onFinderToggle }: Props) {
+  const [localOpen, setLocalOpen] = useState(false);
+  const open = finderOpen ?? localOpen;
+  const setOpen = (v: boolean) => (onFinderToggle ? onFinderToggle(v) : setLocalOpen(v));
   const err = hexCount(pattern) > 0 ? validatePattern(pattern) : null;
   const total = hexCount(pattern);
-  const middle = Math.max(0, 40 - total);
   const letters = letterCount(pattern);
-  const shownPrefix = pattern.caseSensitive ? pattern.prefix : pattern.prefix.toLowerCase();
-  const shownSuffix = pattern.caseSensitive ? pattern.suffix : pattern.suffix.toLowerCase();
+  const clean = DEFAULT_CHAIN.cleanInput;
 
   return (
-    <div style={{ display: 'grid', gap: '14px' }}>
+    <div style={{ display: 'grid', gap: '16px' }}>
       <div class="field-row">
         <div class="field">
-          <label for="prefix">Prefix</label>
+          <label for="prefix">
+            <span>Prefix</span>
+            {!disabled && (
+              <button type="button" class="linkish" onClick={() => setOpen(!open)}>
+                {open ? 'close finder' : 'find a word'}
+              </button>
+            )}
+          </label>
           <div class={`input-wrap ${err && pattern.prefix ? 'invalid' : ''}`}>
-            <span class="affix">0x</span>
+            <span class="affix" aria-hidden="true">
+              0x
+            </span>
             <input
               id="prefix"
               type="text"
@@ -39,13 +51,15 @@ export function PatternFields({ pattern, onChange, disabled, subject = 'address'
               value={pattern.prefix}
               disabled={disabled}
               maxLength={40}
-              onInput={(e) => onChange({ ...pattern, prefix: cleanHex((e.target as HTMLInputElement).value) })}
+              aria-label="Address prefix after 0x"
+              onInput={(e) => onChange({ ...pattern, prefix: clean((e.target as HTMLInputElement).value) })}
             />
           </div>
-          <div class="field-help">Hex only: 0-9 and a-f.</div>
         </div>
         <div class="field">
-          <label for="suffix">Suffix</label>
+          <label for="suffix">
+            <span>Suffix</span>
+          </label>
           <div class={`input-wrap suffix ${err && pattern.suffix ? 'invalid' : ''}`}>
             <input
               id="suffix"
@@ -58,26 +72,39 @@ export function PatternFields({ pattern, onChange, disabled, subject = 'address'
               value={pattern.suffix}
               disabled={disabled}
               maxLength={40}
-              onInput={(e) => onChange({ ...pattern, suffix: cleanHex((e.target as HTMLInputElement).value) })}
+              aria-label="Address suffix"
+              onInput={(e) => onChange({ ...pattern, suffix: clean((e.target as HTMLInputElement).value) })}
             />
-            <span class="affix">end</span>
+            <span class="affix" aria-hidden="true">
+              end
+            </span>
           </div>
-          <div class="field-help">Optional. Prefix, suffix, or both.</div>
         </div>
       </div>
 
-      <div class="preview" aria-live="polite">
-        0x<b>{shownPrefix}</b>
-        {'·'.repeat(Math.min(middle, 40))}
-        <b>{shownSuffix}</b>
-        {total > 0 && (
-          <span>
-            {' '}
-            · {total} fixed character{total === 1 ? '' : 's'} in your {subject}
-          </span>
-        )}
-      </div>
-      {err && <div class="field-error">{err}</div>}
+      {err ? (
+        <div class="field-error" style={{ marginTop: '-6px' }}>
+          {err}
+        </div>
+      ) : (
+        <div class="field-help" style={{ marginTop: '-6px' }}>
+          {total === 0
+            ? `Hex only: 0-9 and a-f. Enter a prefix, a suffix, or both.`
+            : `${total} fixed character${total === 1 ? '' : 's'} in your ${subject}. Each one multiplies the work by 16.`}
+        </div>
+      )}
+
+      {open && (
+        <HexspeakFinder
+          pattern={pattern}
+          rate={rate}
+          onClose={() => setOpen(false)}
+          onPick={(field, hex) => {
+            onChange({ ...pattern, [field]: hex });
+            setOpen(false);
+          }}
+        />
+      )}
 
       <div class="options">
         <label class="toggle">
@@ -96,7 +123,7 @@ export function PatternFields({ pattern, onChange, disabled, subject = 'address'
                 · {letters} letter{letters === 1 ? '' : 's'} = {formatBig(caseMultiplier(pattern))}× harder
               </small>
             )}
-            {pattern.caseSensitive && letters === 0 && total > 0 && <small> · no letters in pattern, no extra cost</small>}
+            {pattern.caseSensitive && letters === 0 && total > 0 && <small> · digits only, no extra cost</small>}
           </span>
         </label>
       </div>

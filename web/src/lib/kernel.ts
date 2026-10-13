@@ -14,6 +14,8 @@ export interface KernelExports {
   miner_lanes(): number;
   miner_found(): number;
   miner_export_lanes(): number;
+  miner_sample(): number;
+  create2_sample(): number;
   derive_address(): number;
   create2_init(): number;
   create2_mine(count: number): number;
@@ -101,6 +103,17 @@ export class Kernel {
     if (this.ex.miner_found() !== 1) return null;
     const io = this.io();
     return { key: io.slice(0, 32), address: io.slice(32, 52) };
+  }
+
+  /** Address currently held by lane 0, for the live preview. */
+  sample(): Uint8Array | null {
+    if (this.ex.miner_sample() !== 1) return null;
+    return this.io().slice(0, 20);
+  }
+
+  create2Sample(): Uint8Array | null {
+    if (this.ex.create2_sample() !== 1) return null;
+    return this.io().slice(0, 20);
   }
 
   /** All lane points as big-endian x||y, 64 bytes per lane (copied out of WASM memory). */

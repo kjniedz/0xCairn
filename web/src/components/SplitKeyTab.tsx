@@ -143,10 +143,11 @@ export function SplitKeyTab({ snap, controller, pattern, setPattern }: Props) {
             </div>
             {pub && <div class="field-help">Point x = 0x{pubToAffine(pub).x.toString(16).padStart(64, '0').slice(0, 16)}… ✓ on curve</div>}
           </div>
-          <PatternFields pattern={pattern} onChange={setPattern} disabled={busy} />
+          <PatternFields pattern={pattern} onChange={setPattern} disabled={busy} rate={controller.estimatedRate()} />
           <DifficultyPanel pattern={pattern} rate={rate} live={live} />
-          <EnginePanel snap={snap} controller={controller} />
           <RunControls snap={snap} controller={controller} pattern={pattern} formError={formError} onStart={() => pub && controller.start({ kind: 'address', pattern, base: pub })} />
+          <hr class="divider" />
+          <EnginePanel snap={snap} controller={controller} />
         </section>
 
         <section class="step">
