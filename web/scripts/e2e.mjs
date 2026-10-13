@@ -159,6 +159,26 @@ try {
     const t = await b.evaluate((el) => el.textContent);
     if (t.includes('New search')) await b.click();
   }
+  // v4 hook bit mask: beforeSwap (bit 7) + afterSwap (bit 6) -> low 14 bits == 0x00c0
+  for (const b of await page.$$('.linkish')) {
+    if ((await b.evaluate((el) => el.textContent)).includes('bit-mask')) await b.click();
+  }
+  await clearInput(page, '#prefix');
+  for (const c of await page.$$('.chip')) {
+    const t = await c.evaluate((el) => el.textContent.trim());
+    if (t === 'beforeSwap' || t === 'afterSwap') await c.click();
+  }
+  const maskVal = await page.$eval('#value', (el) => el.value);
+  check('v4 flags set mask value', maskVal.endsWith('00c0'), maskVal);
+  const before = (await page.$$('.result')).length;
+  await page.click('.btn.primary');
+  await page.waitForFunction((n) => document.querySelectorAll('.result').length > n, { timeout: 60000 }, before);
+  const maskAddr = await page.$eval('.result .kv .v', (el) => el.textContent.trim());
+  const low14 = parseInt(maskAddr.slice(-4), 16) & 0x3fff;
+  check('mask result has low 14 bits == 0x00c0', low14 === 0x00c0, `${maskAddr} low14=0x${low14.toString(16)}`);
+  for (const b of await page.$$('.actions .btn')) {
+    if ((await b.evaluate((el) => el.textContent)).includes('New search')) await b.click();
+  }
 
   // split-key: generate keypair and combine round trip
   await (await page.$$('.tab'))[2].click();

@@ -6,6 +6,8 @@ import { encryptKeystoreV3, keystoreFilename } from '../lib/keystore';
 import { hexToBytes } from '../lib/eth';
 import { normalizePattern, formatBig } from '../lib/pattern';
 import { SITE } from '../site';
+import { SaveToHistory } from './History';
+import { ShareCard } from './ShareCard';
 
 const CHAINS = ['Ethereum', 'Base', 'Arbitrum', 'Optimism', 'Polygon', 'BNB Chain', 'Avalanche', 'zkSync', 'Scroll', 'Linea', 'Gnosis', '+ every EVM chain'];
 
@@ -160,6 +162,13 @@ export function ResultCard({ result, onDismiss }: { result: SearchResult; onDism
             <p style={{ fontSize: '13px', color: 'var(--text-2)' }}>
               This offset is useless on its own. Only the requester, who holds the matching private key, can combine it into the final key in step 3.
             </p>
+          )}
+
+          {(isKey || result.kind === 'create2') && (
+            <div style={{ display: 'grid', gap: '10px' }}>
+              {isKey && <SaveToHistory result={result} />}
+              <ShareCard result={result} />
+            </div>
           )}
 
           {isKey && (

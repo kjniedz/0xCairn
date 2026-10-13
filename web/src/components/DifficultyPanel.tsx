@@ -1,5 +1,5 @@
 import type { Pattern } from '../lib/pattern';
-import { difficulty, hexCount, letterCount, formatBig, formatDuration, formatRate, validatePattern, attemptsForProbability } from '../lib/pattern';
+import { difficulty, hexCount, letterCount, formatBig, formatDuration, formatRate, validatePattern, attemptsForProbability, hasMask, maskBits } from '../lib/pattern';
 import { SITE } from '../site';
 
 interface Props {
@@ -14,7 +14,7 @@ const HOUR = 3600;
 const DAY = 86400;
 
 export function DifficultyPanel({ pattern, rate, live, proLink }: Props) {
-  if (hexCount(pattern) === 0 || validatePattern(pattern)) return null;
+  if ((hexCount(pattern) === 0 && !hasMask(pattern)) || validatePattern(pattern)) return null;
   const diff = difficulty(pattern);
   const n = hexCount(pattern);
   const letters = pattern.caseSensitive ? letterCount(pattern) : 0;
@@ -32,8 +32,9 @@ export function DifficultyPanel({ pattern, rate, live, proLink }: Props) {
           <div class="v">
             1 in {formatBig(diff)}
             <small>
-              16<sup>{n}</sup>
+              {n > 0 ? <>16<sup>{n}</sup></> : null}
               {letters > 0 ? ` × 2^${letters} checksum` : ''}
+              {hasMask(pattern) ? `${n > 0 ? ' × ' : ''}2^${maskBits(pattern.mask!)} mask bits` : ''}
             </small>
           </div>
         </div>

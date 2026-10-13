@@ -6,6 +6,9 @@ export interface Pattern {
   prefix: string;
   suffix: string;
   caseSensitive: boolean;
+  /** Optional bit-mask target (40 hex chars each): (address & mask) == value. */
+  mask?: string;
+  value?: string;
 }
 
 export const HEX_RE = /^[0-9a-fA-F]*$/;
@@ -14,15 +17,36 @@ export const HEX_RE = /^[0-9a-fA-F]*$/;
 export function validatePattern(p: Pattern): string | null {
   if (!HEX_RE.test(p.prefix)) return 'Prefix may only contain hex characters (0-9, a-f).';
   if (!HEX_RE.test(p.suffix)) return 'Suffix may only contain hex characters (0-9, a-f).';
-  if (p.prefix.length + p.suffix.length === 0) return 'Enter a prefix, a suffix, or both.';
+  const hasMask = !!(p.mask || p.value);
+  if (hasMask && (!/^[0-9a-fA-F]{40}$/.test(p.mask ?? '') || !/^[0-9a-fA-F]{40}$/.test(p.value ?? ''))) return 'Mask and value must each be 40 hex characters.';
+  if (hasMask && maskBits(p.mask!) === 0) return 'The mask constrains no bits.';
+  if (p.prefix.length + p.suffix.length === 0 && !hasMask) return 'Enter a prefix, a suffix, or both.';
   if (p.prefix.length + p.suffix.length > 40) return 'An address only has 40 hex characters.';
   return null;
 }
 
+/** Number of constrained bits in a hex mask. */
+export function maskBits(maskHex: string): number {
+  let bits = 0;
+  for (const ch of maskHex) {
+    const v = parseInt(ch, 16);
+    if (Number.isNaN(v)) continue;
+    bits += ((v & 8) >> 3) + ((v & 4) >> 2) + ((v & 2) >> 1) + (v & 1);
+  }
+  return bits;
+}
+
+export function hasMask(p: Pattern): boolean {
+  return !!(p.mask && p.value && /^[0-9a-fA-F]{40}$/.test(p.mask) && /^[0-9a-fA-F]{40}$/.test(p.value));
+}
+
 export function normalizePattern(p: Pattern): Pattern {
-  return p.caseSensitive
-    ? p
-    : { prefix: p.prefix.toLowerCase(), suffix: p.suffix.toLowerCase(), caseSensitive: false };
+  const base = p.caseSensitive ? { ...p } : { ...p, prefix: p.prefix.toLowerCase(), suffix: p.suffix.toLowerCase(), caseSensitive: false };
+  if (p.mask && p.value) {
+    base.mask = p.mask.toLowerCase();
+    base.value = p.value.toLowerCase();
+  }
+  return base;
 }
 
 export function hexCount(p: Pattern): number {
@@ -37,7 +61,8 @@ export function letterCount(p: Pattern): number {
 export function difficulty(p: Pattern): number {
   const n = hexCount(p);
   const letters = p.caseSensitive ? letterCount(p) : 0;
-  return Math.pow(16, n) * Math.pow(2, letters);
+  const maskFactor = hasMask(p) ? Math.pow(2, maskBits(p.mask!)) : 1;
+  return Math.pow(16, n) * Math.pow(2, letters) * maskFactor;
 }
 
 /** How many times harder case-sensitive matching makes this pattern. */
@@ -118,6 +143,12 @@ export function formatRate(perSecond: number): string {
  */
 export function matchesPattern(lower40: string, checksummed40: string, p: Pattern): boolean {
   const n = normalizePattern(p);
+  if (hasMask(n)) {
+    for (let i = 0; i < 40; i++) {
+      const m = parseInt(n.mask![i], 16);
+      if ((parseInt(lower40[i], 16) & m) !== (parseInt(n.value![i], 16) & m)) return false;
+    }
+  }
   if (!lower40.startsWith(n.prefix.toLowerCase())) return false;
   if (!lower40.endsWith(n.suffix.toLowerCase())) return false;
   if (!n.caseSensitive) return true;
@@ -174,6 +205,14 @@ export function packForGpu(p: Pattern): PackedPattern {
   for (let i = 0; i < p.prefix.length; i++) set(i, p.prefix[i]);
   const off = 40 - p.suffix.length;
   for (let j = 0; j < p.suffix.length; j++) set(off + j, p.suffix[j]);
+  if (hasMask(p)) {
+    for (let i = 0; i < 20; i++) {
+      const m = parseInt(p.mask!.slice(2 * i, 2 * i + 2), 16);
+      const v = parseInt(p.value!.slice(2 * i, 2 * i + 2), 16);
+      maskBytes[i] |= m;
+      valueBytes[i] = (valueBytes[i] & ~m) | (v & m);
+    }
+  }
 
   const pack = (b: Uint8Array) => {
     const w = new Uint32Array(5);

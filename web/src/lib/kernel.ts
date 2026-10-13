@@ -14,6 +14,7 @@ export interface KernelExports {
   miner_lanes(): number;
   miner_found(): number;
   miner_export_lanes(): number;
+  set_mask(): number;
   miner_sample(): number;
   create2_sample(): number;
   derive_address(): number;
@@ -70,6 +71,15 @@ export class Kernel {
     io.set(s, p.length);
     const rc = this.ex.set_pattern(p.length, s.length, caseSensitive ? 1 : 0);
     if (rc !== 0) throw new Error('invalid pattern');
+  }
+
+  /** Adds a bit-mask constraint to the current pattern: (addr & mask) == value. */
+  setMask(mask: Uint8Array, value: Uint8Array): void {
+    if (mask.length !== 20 || value.length !== 20) throw new Error('mask and value must be 20 bytes');
+    const io = this.io();
+    io.set(mask, 0);
+    io.set(value, 20);
+    if (this.ex.set_mask() !== 0) throw new Error('set_mask: no pattern set');
   }
 
   /** seed: 32-byte big-endian scalar. base: optional 65-byte uncompressed public key. */

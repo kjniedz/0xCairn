@@ -26,8 +26,8 @@ export interface Candidate {
 }
 
 export type WorkerJob =
-  | { kind: 'address'; prefix: string; suffix: string; caseSensitive: boolean; base?: Uint8Array; lanes: number }
-  | { kind: 'create2'; prefix: string; suffix: string; caseSensitive: boolean; deployer: Uint8Array; initCodeHash: Uint8Array };
+  | { kind: 'address'; prefix: string; suffix: string; caseSensitive: boolean; mask?: Uint8Array; value?: Uint8Array; base?: Uint8Array; lanes: number }
+  | { kind: 'create2'; prefix: string; suffix: string; caseSensitive: boolean; mask?: Uint8Array; value?: Uint8Array; deployer: Uint8Array; initCodeHash: Uint8Array };
 
 export type WorkerIn =
   | { type: 'init' }

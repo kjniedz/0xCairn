@@ -3,8 +3,12 @@ import { defineConfig, type Plugin } from 'vite';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 import { FAQ } from './src/content/faq.ts';
 import { SITE } from './src/site.ts';
+import { seoPages } from './scripts/seo.ts';
 
 /**
  * Content Security Policy. Also served as a response header from public/_headers;
@@ -30,7 +34,11 @@ function headInjection(): Plugin {
   return {
     name: 'cairn-head',
     apply: 'build',
-    transformIndexHtml(html) {
+    transformIndexHtml(html, ctx) {
+      const isMain = ctx.filename.endsWith(`${path.sep}index.html`) && !/[\\/](pro|order|teams|privacy|terms)[\\/]index\.html$/.test(ctx.filename);
+      if (!isMain) {
+        return { html, tags: [{ tag: 'meta', attrs: { 'http-equiv': 'Content-Security-Policy', content: CSP }, injectTo: 'head-prepend' }] };
+      }
       const faq = {
         '@context': 'https://schema.org',
         '@type': 'FAQPage',
@@ -95,8 +103,10 @@ function serviceWorker(): Plugin {
     },
     closeBundle() {
       const dist = path.resolve(root, outDir);
+      // SEO pages are plain static HTML with no scripts; they are not precached so the
+      // offline bundle stays small. The generator and the app routes are.
       const files = walk(dist)
-        .filter((f) => !f.endsWith('.map') && !NOT_PRECACHED.has(f))
+        .filter((f) => !f.endsWith('.map') && !NOT_PRECACHED.has(f) && !/^(vanity|hexspeak|difficulty|guides)\//.test(f))
         .sort();
       const urls = ['/', ...files.filter((f) => f !== 'index.html').map((f) => '/' + f)];
       const hash = createHash('sha256');
@@ -114,7 +124,7 @@ function serviceWorker(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [preact(), headInjection(), serviceWorker()],
+  plugins: [preact(), headInjection(), seoPages(), serviceWorker()],
   worker: { format: 'es' },
   assetsInclude: ['**/*.wasm'],
   build: {
@@ -122,6 +132,16 @@ export default defineConfig({
     sourcemap: false,
     assetsInlineLimit: 0,
     modulePreload: { polyfill: false },
+    rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, 'index.html'),
+        pro: path.resolve(__dirname, 'pro/index.html'),
+        order: path.resolve(__dirname, 'order/index.html'),
+        teams: path.resolve(__dirname, 'teams/index.html'),
+        privacy: path.resolve(__dirname, 'privacy/index.html'),
+        terms: path.resolve(__dirname, 'terms/index.html'),
+      },
+    },
   },
   server: {
     headers: { 'Content-Security-Policy': CSP.replace("script-src 'self' 'wasm-unsafe-eval'", "script-src 'self' 'wasm-unsafe-eval' 'unsafe-inline'").replace("style-src 'self'", "style-src 'self' 'unsafe-inline'") },

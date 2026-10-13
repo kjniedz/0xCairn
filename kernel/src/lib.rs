@@ -44,6 +44,8 @@ pub struct Pattern {
     case_sensitive: bool,
     /// Per hex position (0..40): 0 = any, 1 = must be uppercase, 2 = must be lowercase.
     case_req: [u8; 40],
+    /// Optional bit mask: (addr & mask) == value.
+    mask: Option<([u8; 20], [u8; 20])>,
 }
 
 impl Pattern {
@@ -66,11 +68,22 @@ impl Pattern {
         if !case_sensitive {
             case_req = [0u8; 40];
         }
-        Some(Pattern { prefix: p, suffix: s, case_sensitive, case_req })
+        Some(Pattern { prefix: p, suffix: s, case_sensitive, case_req, mask: None })
+    }
+
+    pub fn set_mask(&mut self, mask: [u8; 20], value: [u8; 20]) {
+        self.mask = Some((mask, value));
     }
 
     #[inline]
     pub fn matches(&self, addr: &[u8; 20]) -> bool {
+        if let Some((m, v)) = &self.mask {
+            for i in 0..20 {
+                if addr[i] & m[i] != v[i] & m[i] {
+                    return false;
+                }
+            }
+        }
         for (i, &nb) in self.prefix.iter().enumerate() {
             if addr_nibble(addr, i) != nb {
                 return false;
@@ -404,6 +417,25 @@ pub extern "C" fn set_pattern(prefix_len: u32, suffix_len: u32, case_sensitive: 
     }
 }
 
+/// IO[0..20] = mask, IO[20..40] = value. Adds a bit-mask constraint to the current pattern.
+/// Call after set_pattern. Returns 0 on success, 2 if no pattern is set.
+#[no_mangle]
+#[allow(static_mut_refs)]
+pub extern "C" fn set_mask() -> u32 {
+    let io = io();
+    let mut m = [0u8; 20];
+    let mut v = [0u8; 20];
+    m.copy_from_slice(&io[..20]);
+    v.copy_from_slice(&io[20..40]);
+    match unsafe { PATTERN.as_mut() } {
+        Some(p) => {
+            p.set_mask(m, v);
+            0
+        }
+        None => 2,
+    }
+}
+
 /// IO[0..32] = 256-bit seed scalar (big-endian). If has_base != 0,
 /// IO[32..97] = uncompressed SEC1 public key to offset from (split-key mode).
 /// Returns 0 on success, 1 bad seed, 2 bad base point, 3 bad lane count.
@@ -723,6 +755,29 @@ mod tests {
         let (s, a) = c.found.unwrap();
         assert_eq!(s, salt);
         assert_eq!(addr_hex(&a), "60f3f640a8508fc6a86d45df051962668e1e8ac7");
+    }
+
+    #[test]
+    fn mask_constraint() {
+        let mut pat = Pattern::parse(b"", b"", false).unwrap();
+        let mut mask = [0u8; 20];
+        let mut value = [0u8; 20];
+        mask[18] = 0x3f;
+        mask[19] = 0xff;
+        value[18] = 0x0c;
+        value[19] = 0x80;
+        pat.set_mask(mask, value);
+        let mut a = [0u8; 20];
+        a[18] = 0xcc; // high bits outside mask may differ
+        a[19] = 0x80;
+        assert!(pat.matches(&a));
+        a[19] = 0x81;
+        assert!(!pat.matches(&a));
+        let mut c = Create2::new(&[0u8; 20], &[0u8; 32], &[7u8; 32]);
+        assert!(c.mine(1 << 20, &pat));
+        let (_, addr) = c.found.unwrap();
+        assert_eq!(addr[18] & 0x3f, 0x0c);
+        assert_eq!(addr[19], 0x80);
     }
 
     #[test]

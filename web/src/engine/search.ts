@@ -8,6 +8,7 @@ import { GpuRunner } from './gpuRunner';
 import type { Candidate, Job, SearchResult, SearchSnapshot, SearchStatus, EngineStats } from './types';
 import { matchesPattern, normalizePattern } from '../lib/pattern';
 import { bytesToHex, privateKeyToAddress, toChecksum, create2Address, splitKeyAddress } from '../lib/eth';
+import { writeCheckpoint, clearCheckpoint } from '../lib/history';
 
 type Listener = (s: SearchSnapshot) => void;
 
@@ -32,6 +33,7 @@ export class SearchController {
   private seenSecrets = new Set<string>();
   private sample: Uint8Array | null = null;
   private benching = false;
+  private lastCheckpoint = 0;
 
   engines: EngineStats = {
     cpu: { workers: 0, ready: false, benchRate: null, liveRate: 0 },
@@ -211,6 +213,7 @@ export class SearchController {
   }
 
   stop(): void {
+    clearCheckpoint();
     this.pool.stop();
     this.gpu?.stop();
     if (this.status === 'running') this.accumulatedMs += performance.now() - this.runStart;
@@ -283,6 +286,7 @@ export class SearchController {
       pattern: job.pattern,
     };
     this.results = [result, ...this.results];
+    clearCheckpoint();
     // auto-pause so the machine stops burning once we have a match
     this.pool.pause();
     this.gpu?.pause();
@@ -318,8 +322,20 @@ export class SearchController {
     }, 120);
   }
 
+  private checkpoint(): void {
+    const job = this.job;
+    if (!job || (this.status !== 'running' && this.status !== 'paused')) return;
+    const t = performance.now();
+    if (t - this.lastCheckpoint < 3000) return;
+    this.lastCheckpoint = t;
+    // never key material: pattern, counts and timing only
+    if (job.kind === 'address' && job.base) return; // split jobs are for someone else; nothing to recover
+    writeCheckpoint({ pattern: job.pattern, kind: job.kind, attempts: this.cpuAttempts + this.gpuAttempts, elapsedMs: this.accumulatedMs + (this.status === 'running' ? t - this.runStart : 0), updatedAt: Date.now() });
+  }
+
   private emit(): void {
     if (this.status === 'running') this.updateRates();
+    this.checkpoint();
     const snap = this.snapshot();
     for (const l of this.listeners) l(snap);
   }

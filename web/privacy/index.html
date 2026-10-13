@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Privacy | 0xCairn</title>
+    <meta name="description" content="What 0xCairn stores, which is almost nothing. The generator never contacts a server. Pro and Teams orders store only what fulfilment needs." />
+    <link rel="canonical" href="https://0xcairn.kyleniedz99.workers.dev/privacy/" />
+    <meta name="theme-color" content="#0f0e0c" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="referrer" content="no-referrer" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="stylesheet" href="/legal.css" />
+  </head>
+  <body>
+    <div class="bm-strip"></div>
+    <div class="wrap">
+      <header class="header"><a class="brand" href="/"><span class="brand-name">0x<span>Cairn</span></span></a><nav class="header-links"><a href="/pro/">Pro</a><a href="/teams/">Teams</a><a href="/terms/">Terms</a></nav></header>
+      <main class="legal">
+        <h1>Privacy</h1>
+        <p class="muted">Last updated 13 October 2026</p>
+        <h2>The generator</h2>
+        <p>The address generator at the root of this site runs entirely in your browser. It makes no network requests during generation, loads no analytics or third-party scripts, sets no cookies, and is served with a Content Security Policy that forbids connections to anything but its own files. We cannot see the patterns you search for, the keys you generate, or that you visited at all beyond the ordinary server logs Cloudflare keeps for serving static files, which we do not read or export.</p>
+        <h2>Cairn Pro orders</h2>
+        <p>When you place a Pro order we store: the public key you generated, your target pattern, the unique payment address we derived for the order, the amount and asset, the offset our GPUs find, timing and attempt counts, and an email address only if you enter one. We do not store IP addresses, user agents, or your private key half, which never leaves your browser. Orders and their data are deleted 90 days after completion or expiry.</p>
+        <h2>Teams jobs</h2>
+        <p>API jobs store the deployer address, init code hash, target, the salt we find, and the API key that submitted them. Contact form messages store the email, company and message you type. API keys are stored hashed.</p>
+        <h2>Payments</h2>
+        <p>Payments are on-chain transfers to addresses we derive per order. We read public chain data to detect them through third-party RPC endpoints (Cloudflare Ethereum gateway, Base public RPC); those providers see the queries we make but receive nothing about you. We fetch the ETH/USD spot price from Coinbase's public API server-side at quote time.</p>
+        <h2>Email</h2>
+        <p>If you give an email for a "found" notification we send exactly one message when the job completes and nothing else. We never share or sell it.</p>
+        <h2>Your rights</h2>
+        <p>Email the address in the repository README to have an order's data deleted early. Because we store no identity beyond what you typed, deletion is by order link.</p>
+      </main>
+      <footer class="footer"><span>A Black Mountain product · <a href="https://github.com/kjniedz/0xCairn" rel="noopener">source</a> · <a href="/terms/">terms</a></span></footer>
+    </div>
+  </body>
+</html>

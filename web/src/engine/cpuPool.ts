@@ -2,7 +2,8 @@
  * Manages one mining Web Worker per CPU core and aggregates their progress.
  */
 import type { Candidate, Job, WorkerIn, WorkerOut, WorkerJob } from './types';
-import { normalizePattern } from '../lib/pattern';
+import { normalizePattern, hasMask } from '../lib/pattern';
+import { hexToBytes } from '../lib/eth';
 
 export const LANES_PER_WORKER = 512;
 
@@ -110,10 +111,12 @@ export class CpuPool {
     const n = Math.min(workers ?? this.slots.length, this.slots.length);
     this.active = n;
     const p = normalizePattern(job.pattern);
+    const mask = hasMask(p) ? hexToBytes(p.mask!) : undefined;
+    const value = hasMask(p) ? hexToBytes(p.value!) : undefined;
     const base: WorkerJob =
       job.kind === 'address'
-        ? { kind: 'address', prefix: p.prefix, suffix: p.suffix, caseSensitive: p.caseSensitive, base: job.base, lanes: LANES_PER_WORKER }
-        : { kind: 'create2', prefix: p.prefix, suffix: p.suffix, caseSensitive: p.caseSensitive, deployer: job.deployer, initCodeHash: job.initCodeHash };
+        ? { kind: 'address', prefix: p.prefix, suffix: p.suffix, caseSensitive: p.caseSensitive, mask, value, base: job.base, lanes: LANES_PER_WORKER }
+        : { kind: 'create2', prefix: p.prefix, suffix: p.suffix, caseSensitive: p.caseSensitive, mask, value, deployer: job.deployer, initCodeHash: job.initCodeHash };
     this.slots.forEach((s, i) => {
       s.attempts = 0;
       if (i < n) this.send(s.worker, { type: 'start', job: base });

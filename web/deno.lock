@@ -1,0 +1,36 @@
+{
+  "version": "5",
+  "specifiers": {
+    "jsr:@std/cli@1": "1.0.32"
+  },
+  "jsr": {
+    "@std/cli@1.0.32": {
+      "integrity": "188b3a100d6202d64e3f5bd3d799c7fa4f6d77f92cc65eb7f641c1fa0aa92a66"
+    }
+  },
+  "workspace": {
+    "packageJson": {
+      "dependencies": [
+        "npm:@cloudflare/workers-types@^5.20261013.1",
+        "npm:@fontsource-variable/montserrat@^5.3.0",
+        "npm:@noble/ciphers@^2.4.0",
+        "npm:@noble/curves@^2.4.0",
+        "npm:@noble/hashes@^2.4.0",
+        "npm:@preact/preset-vite@^2.10.6",
+        "npm:@resvg/resvg-js@^2.6.2",
+        "npm:@scure/bip32@^2.4.0",
+        "npm:@types/node@^24.13.3",
+        "npm:@types/qrcode@^1.5.6",
+        "npm:@webgpu/types@~0.1.74",
+        "npm:hono@^4.13.13",
+        "npm:preact@^10.29.8",
+        "npm:puppeteer-core@^25.13.0",
+        "npm:qrcode@^1.5.4",
+        "npm:typescript@~6.0.2",
+        "npm:vite-plugin-pwa@2",
+        "npm:vite@^8.3.0",
+        "npm:wrangler@^4.149.0"
+      ]
+    }
+  }
+}

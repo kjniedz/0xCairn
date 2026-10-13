@@ -1,14 +1,34 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  // Static-assets-only Worker on Kyle's personal Cloudflare account (kyleniedz99@gmail.com).
+  // Kyle's personal Cloudflare account (kyleniedz99@gmail.com). Deploy with:
+  //   XDG_CONFIG_HOME=~/.config/wrangler-personal npm run deploy
   "name": "0xcairn",
   "account_id": "4443bdbbbe27478e0ab205bc81a954ad",
+  "main": "worker/index.ts",
   "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
   "assets": {
     "directory": "./dist",
+    "binding": "ASSETS",
     "html_handling": "auto-trailing-slash",
-    "not_found_handling": "none"
-  }
-  // Custom domain, once one is chosen:
+    "not_found_handling": "none",
+    // Only /api/* reaches the Worker. The generator and every other page are
+    // served straight from the static asset store, so no code runs on them.
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [{ "binding": "DB", "database_name": "0xcairn", "database_id": "3ad51a5d-52b5-467f-b6ba-f4263169772e" }],
+  "triggers": { "crons": ["*/5 * * * *"] },
+  "vars": {
+    "SITE_URL": "https://0xcairn.kyleniedz99.workers.dev",
+    "RPC_ETH": "https://cloudflare-eth.com",
+    "RPC_BASE": "https://mainnet.base.org",
+    "USDC_BASE": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+  },
+  // Secrets (set with `wrangler secret put NAME` under the personal profile):
+  //   PAYMENT_XPUB   BIP32 xpub whose child i receives payment for order i. Keep the xpriv offline.
+  //   WORKER_TOKEN   shared bearer token for GPU workers (gpu-worker/worker.ts)
+  //   ADMIN_TOKEN    bearer token for /api/admin/*
+  "observability": { "enabled": false }
+  // Custom domain, once chosen:
   // "routes": [{ "pattern": "0xcairn.com", "custom_domain": true }]
 }

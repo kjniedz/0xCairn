@@ -9,6 +9,7 @@ import { TrustStrip } from './components/TrustStrip';
 import { Explainer } from './components/Explainer';
 import { Faq } from './components/Faq';
 import { Footer } from './components/Footer';
+import { HistoryDrawer } from './components/History';
 import { useSearch } from './hooks/useSearch';
 import type { Pattern } from './lib/pattern';
 import { DEFAULT_CHAIN } from './chains/evm';
@@ -83,6 +84,7 @@ export function App() {
             </div>
           )}
 
+          <HistoryDrawer />
           <Explainer />
           <Faq />
         </main>

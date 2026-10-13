@@ -108,6 +108,7 @@ self.onmessage = async (e: MessageEvent<WorkerIn>) => {
         if (!kernel) throw new Error('kernel not loaded');
         job = m.job;
         kernel.setPattern(job.prefix, job.suffix, job.caseSensitive);
+        if (job.mask && job.value) kernel.setMask(job.mask, job.value);
         if (job.kind === 'address') {
           initMiner(kernel, job.lanes, job.base);
         } else {
