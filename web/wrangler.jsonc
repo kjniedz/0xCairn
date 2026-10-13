@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Static-assets-only Worker on Kyle's personal Cloudflare account (kyleniedz99@gmail.com).
+  "name": "0xcairn",
+  "account_id": "4443bdbbbe27478e0ab205bc81a954ad",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./dist",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "none"
+  }
+  // Custom domain, once one is chosen:
+  // "routes": [{ "pattern": "0xcairn.com", "custom_domain": true }]
+}

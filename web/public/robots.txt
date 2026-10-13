@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /assets/
+
+Sitemap: https://0xcairn.kyleniedz99.workers.dev/sitemap.xml

@@ -1,0 +1,37 @@
+{
+  "name": "0xcairn",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "deploy": "npm run build && wrangler deploy",
+    "icons": "node scripts/icons.mjs",
+    "test:lib": "npx -y deno@2 run -A src/lib/lib.test.ts",
+    "test:gpu": "npx -y deno@2 run -A src/gpu/test.ts",
+    "test:e2e": "npm run build && node scripts/e2e.mjs"
+  },
+  "dependencies": {
+    "@noble/ciphers": "^2.4.0",
+    "@noble/curves": "^2.4.0",
+    "@noble/hashes": "^2.4.0",
+    "preact": "^10.29.8",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "^2.10.6",
+    "@resvg/resvg-js": "^2.6.2",
+    "@types/node": "^24.13.3",
+    "@types/qrcode": "^1.5.6",
+    "@webgpu/types": "^0.1.74",
+    "puppeteer-core": "^25.13.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.3.0",
+    "vite-plugin-pwa": "^2.0.0",
+    "wrangler": "^4.149.0"
+  },
+  "description": "Vanity address generator for Ethereum and every EVM chain. Browser-only, WASM + WebGPU.",
+  "license": "MIT"
+}
