@@ -71,21 +71,21 @@ npm run test:gpu [-- --bench]                    # WGSL vs noble, exact targets 
 npm run test:e2e                                 # headless Chrome: mining, pause/resume, CREATE2, v4 mask, split-key, CSP, SW
 ```
 
-## Deploy (personal Cloudflare account)
+## Deploy (Cloudflare Workers)
 
 ```bash
 cd web
-XDG_CONFIG_HOME=~/.config/wrangler-personal npm run deploy
+npm run deploy
 ```
 
-One-time setup already done: D1 database `0xcairn` (schema in `worker/schema.sql`), secrets `WORKER_TOKEN` and `ADMIN_TOKEN`. Still required before Pro/Teams can take payments:
+One-time setup: a D1 database named `0xcairn` (schema in `worker/schema.sql`), the secrets `WORKER_TOKEN` (GPU workers) and `ADMIN_TOKEN` (admin endpoints), and your own `account_id`, `SITE_URL` and `BTC_ADDRESS` in `wrangler.jsonc`. Before Pro and Teams can take USDC or ETH:
 
 ```bash
 # BIP32 account-level xpub; child i receives payment for order i. Keep the xpriv offline.
-XDG_CONFIG_HOME=~/.config/wrangler-personal npx wrangler secret put PAYMENT_XPUB
+npx wrangler secret put PAYMENT_XPUB
 ```
 
-Bitcoin checkout works today (`BTC_ADDRESS` var in `wrangler.jsonc`, tips and payments both go to `bc1quspfcg3k95lde05tfh0n798nz3k09v75j0zmvp`). Until `PAYMENT_XPUB` is set, `/api/health` reports `evm: false`, the USDC and ETH buttons are disabled and the Pro page defaults to BTC. Postpaid Teams keys work without any payment config.
+Bitcoin checkout works with only `BTC_ADDRESS` set (tips and payments both go to it, confirmed through mempool.space). Until `PAYMENT_XPUB` is set, `/api/health` reports `evm: false`, the USDC and ETH buttons are disabled and the Pro page defaults to BTC. Postpaid Teams keys work without any payment config.
 
 Schema changes after the initial deploy live in `web/worker/migrations/` and are applied with `wrangler d1 execute 0xcairn --remote --file=worker/migrations/NNN.sql`.
 
